@@ -1,0 +1,6 @@
+logs/
+infra/map-service/tiles/
+infra/osrm/data/
+*.log
+.env
+.DS_Store

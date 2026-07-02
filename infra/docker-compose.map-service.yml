@@ -1,0 +1,19 @@
+name: taxi-map-service
+
+services:
+  map-service:
+    build:
+      context: ../map-service
+    image: taxi-map-service:local
+    ports:
+      - "${MAP_SERVICE_PORT:-8090}:8090"
+    environment:
+      PORT: "8090"
+      MAP_STORAGE_PATH: /data/tiles
+      MAP_OSM_PATH: /data/osm/turkmenistan-latest.osm.pbf
+      LOG_FILE: /var/log/taxi/map-service.log
+    volumes:
+      - ./map-service/tiles:/data/tiles
+      - ./osrm/data:/data/osm
+      - ../logs:/var/log/taxi
+    restart: unless-stopped
