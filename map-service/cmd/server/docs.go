@@ -32,7 +32,7 @@ const openapiYAML = `openapi: 3.0.3
 info:
   title: API микросервиса карт Taxi MVP
   version: 1.0.0
-  description: "Микросервис карт для выдачи тайлов, версионирования карты, manifest и delta-обновлений."
+  description: "Микросервис карт для выдачи тайлов, локального кеширования PNG-тайлов, startup-загрузки OSM PBF Туркменистана, ночной синхронизации карты, manifest и delta-обновлений."
 servers:
   - url: http://localhost:8090
 paths:
@@ -96,7 +96,7 @@ paths:
     get:
       summary: Текущая версия карты
       operationId: getMapVersion
-      description: "Возвращает текущую версию карты. Мобильные приложения вызывают этот endpoint перед синхронизацией кеша, чтобы понять, нужно ли запрашивать manifest и delta update."
+      description: "Возвращает текущую версию карты. Версия рассчитывается из metadata локального OSM PBF-файла и меняется после успешного скачивания новой карты."
       responses:
         "200":
           description: Метаданные текущей версии карты.
@@ -108,7 +108,7 @@ paths:
     get:
       summary: Manifest тайлов
       operationId: getMapManifest
-      description: "Возвращает manifest тайлов для региона: поддерживаемые zoom levels, checksum значения и URL template. Клиент использует эти данные для первичной загрузки и проверки локального кеша карты."
+      description: "Возвращает manifest тайлов для региона: поддерживаемые zoom levels, checksum значения, URL template и час ночной синхронизации карты."
       parameters:
         - name: region
           in: query
@@ -155,7 +155,7 @@ paths:
     get:
       summary: Информация об OSM PBF-файле
       operationId: getMapDownloadInfo
-      description: "Возвращает диагностическую информацию об OSM PBF-файле: источник, путь внутри контейнера, наличие файла, размер и дату изменения. Используется для проверки инфраструктуры и подготовки offline/OSRM данных."
+      description: "Возвращает диагностическую информацию об OSM PBF-файле и metadata последней синхронизации: источник, путь внутри контейнера, наличие файла, размер, ETag, Last-Modified, версию карты и час ночной проверки."
       responses:
         "200":
           description: Статус локального OSM PBF-файла.
@@ -167,7 +167,7 @@ paths:
     get:
       summary: PNG-тайл карты
       operationId: getRasterTile
-      description: "Возвращает PNG raster tile по координатам web map tile scheme. Этот endpoint напрямую использует мобильное приложение или картографическая библиотека для отображения карты."
+      description: "Возвращает PNG raster tile по координатам web map tile scheme. Сервис сначала ищет тайл в локальном /data/tiles; если тайла нет, скачивает его из OpenStreetMap, сохраняет локально и отдает клиенту."
       parameters:
         - name: z
           in: path
@@ -220,7 +220,7 @@ components:
           description: Текущее серверное время.
     MapVersionResponse:
       type: object
-      description: Текущая версия карты.
+      description: Текущая версия карты, рассчитанная из metadata локального OSM PBF-файла.
       properties:
         region:
           type: string
@@ -312,7 +312,7 @@ components:
           description: Новый checksum tile.
     DownloadInfoResponse:
       type: object
-      description: Информация об OSM PBF-файле.
+      description: Информация об OSM PBF-файле и последней синхронизации.
       properties:
         source:
           type: string
@@ -321,9 +321,16 @@ components:
         path:
           type: string
           description: Путь к файлу внутри контейнера.
+        metadataPath:
+          type: string
+          description: Путь к metadata-файлу внутри контейнера.
         exists:
           type: boolean
           description: Найден ли файл.
+        version:
+          type: string
+          description: Текущая версия карты.
+          example: tm-a1b2c3d4e5f6a7b8
         sizeBytes:
           type: integer
           format: int64
@@ -332,4 +339,26 @@ components:
           type: string
           format: date-time
           description: Время последнего изменения файла.
+        etag:
+          type: string
+          description: Remote ETag, сохраненный после последней синхронизации.
+        lastModified:
+          type: string
+          description: Remote Last-Modified, сохраненный после последней синхронизации.
+        contentLength:
+          type: integer
+          format: int64
+          description: Remote Content-Length, сохраненный после последней синхронизации.
+        downloadedAt:
+          type: string
+          format: date-time
+          description: Время последнего успешного скачивания PBF.
+        syncHourUTC:
+          type: integer
+          description: Час ночной синхронизации в UTC.
+          example: 3
+        tileStoragePath:
+          type: string
+          description: Путь локального хранилища PNG-тайлов.
+          example: /data/tiles
 `

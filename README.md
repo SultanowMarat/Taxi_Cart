@@ -8,7 +8,8 @@
 - версионирование карты;
 - manifest для кеширования тайлов на клиенте;
 - delta updates между версиями карты;
-- информацию о локальном OSM PBF-файле;
+- скачивание и ночную синхронизацию OSM PBF-файла Туркменистана;
+- локальное хранение и выдачу PNG-тайлов;
 - Swagger UI для ручного тестирования API.
 
 ## Зона ответственности
@@ -19,7 +20,11 @@
 - сообщает текущую версию карты;
 - отдает manifest тайлов для кеширования на клиенте;
 - отдает delta-обновления между версиями карты;
-- показывает диагностическую информацию по OSM PBF-файлу;
+- при запуске проверяет и скачивает `turkmenistan-latest.osm.pbf`, если файла нет локально;
+- каждую ночь сверяет remote metadata Geofabrik и скачивает новую версию, если карта изменилась;
+- хранит metadata скачанной карты рядом с PBF-файлом;
+- кеширует PNG-тайлы в локальном volume и отдает их клиентам/водителям;
+- показывает диагностическую информацию по локальному OSM PBF-файлу;
 - предоставляет Swagger/OpenAPI документацию.
 
 Что сервис сейчас не делает:
@@ -37,7 +42,15 @@ Map-service может принимать координаты как парам
 
 Тайлы тоже относятся к этому микросервису.
 
-Сейчас endpoint `/tiles/{z}/{x}/{y}.png` проксирует PNG-тайлы из OpenStreetMap:
+Endpoint `/tiles/{z}/{x}/{y}.png` работает по принципу cache-first:
+
+1. Сервис ищет PNG-тайл в локальном хранилище `/data/tiles`.
+2. Если тайл найден, сразу отдает его клиенту.
+3. Если тайла нет, скачивает его из OpenStreetMap.
+4. Сохраняет скачанный тайл в `/data/tiles/{z}/{x}/{y}.png`.
+5. Отдает тайл клиенту.
+
+Upstream-источник для первичной загрузки тайлов:
 
 ```text
 https://tile.openstreetmap.org/{z}/{x}/{y}.png
@@ -49,7 +62,46 @@ https://tile.openstreetmap.org/{z}/{x}/{y}.png
 infra/map-service/tiles -> /data/tiles
 ```
 
-Но в текущей реализации постоянное сохранение тайлов в `/data/tiles` еще не включено: сервис получает тайл от upstream-провайдера и сразу отдает его клиенту. Для production правильнее добавить локальный tile cache или собственный tile server, чтобы тайлы реально хранились у нас и приложение не зависело напрямую от публичного OpenStreetMap tile endpoint.
+После первого запроса конкретный тайл хранится локально и повторно отдается уже без обращения к OpenStreetMap.
+
+## Синхронизация карты Туркменистана
+
+При запуске сервис проверяет локальный файл:
+
+```text
+/data/osm/turkmenistan-latest.osm.pbf
+```
+
+Если файла нет, сервис скачивает его из Geofabrik:
+
+```text
+https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf
+```
+
+Рядом сохраняется metadata-файл:
+
+```text
+/data/osm/turkmenistan-latest.osm.pbf.metadata.json
+```
+
+В metadata хранятся:
+
+- `etag`;
+- `lastModified`;
+- `contentLength`;
+- рассчитанная `version`;
+- время скачивания.
+
+Каждую ночь, по умолчанию в `03:00 UTC`, сервис делает `HEAD`-проверку remote-файла. Если `ETag`, `Last-Modified` или `Content-Length` изменились, сервис скачивает новый PBF, обновляет metadata и меняет версию карты.
+
+Настройки:
+
+```env
+MAP_OSM_SOURCE_URL=https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf
+MAP_OSM_PATH=/data/osm/turkmenistan-latest.osm.pbf
+MAP_SYNC_HOUR_UTC=3
+MAP_STORAGE_PATH=/data/tiles
+```
 
 ## Структура
 
@@ -176,7 +228,7 @@ curl http://localhost:8090/openapi.yaml
 
 ### `GET /api/map/version`
 
-Возвращает текущую версию карты для региона.
+Возвращает текущую версию карты для региона. Версия рассчитывается из metadata локального OSM PBF-файла и меняется после успешного скачивания новой версии карты.
 
 Мобильное приложение вызывает этот endpoint при старте или перед обновлением кеша. Если версия на сервере отличается от версии, сохраненной на устройстве, приложение запрашивает manifest и delta.
 
@@ -292,7 +344,7 @@ curl "http://localhost:8090/api/map/delta?from=tm-2026.05-demo&to=tm-2026.06-dem
 
 ### `GET /api/map/download-info`
 
-Показывает статус локального OSM PBF-файла.
+Показывает статус локального OSM PBF-файла и metadata последней синхронизации.
 
 Endpoint нужен для диагностики инфраструктуры: можно быстро понять, скачан ли исходный OSM-файл, где он лежит в контейнере и какой у него размер.
 
@@ -308,9 +360,17 @@ curl http://localhost:8090/api/map/download-info
 {
   "source": "https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf",
   "path": "/data/osm/turkmenistan-latest.osm.pbf",
+  "metadataPath": "/data/osm/turkmenistan-latest.osm.pbf.metadata.json",
   "exists": true,
+  "version": "tm-a1b2c3d4e5f6a7b8",
   "sizeBytes": 987654321,
-  "modifiedAt": "2026-07-02T10:15:30Z"
+  "modifiedAt": "2026-07-02T10:15:30Z",
+  "etag": "\"abc123\"",
+  "lastModified": "Thu, 02 Jul 2026 02:10:00 GMT",
+  "contentLength": 987654321,
+  "downloadedAt": "2026-07-02T03:00:02Z",
+  "syncHourUTC": 3,
+  "tileStoragePath": "/data/tiles"
 }
 ```
 
@@ -318,15 +378,23 @@ curl http://localhost:8090/api/map/download-info
 
 - `source` — источник OSM данных;
 - `path` — путь внутри контейнера;
+- `metadataPath` — путь к metadata-файлу;
 - `exists` — найден ли файл;
+- `version` — текущая версия карты;
 - `sizeBytes` — размер файла, если он найден;
-- `modifiedAt` — время последнего изменения файла.
+- `modifiedAt` — время последнего изменения файла;
+- `etag`, `lastModified`, `contentLength` — remote metadata, по которым сервис определяет изменения;
+- `downloadedAt` — когда PBF был скачан;
+- `syncHourUTC` — час ночной синхронизации;
+- `tileStoragePath` — локальное хранилище PNG-тайлов.
 
 ### `GET /tiles/{z}/{x}/{y}.png`
 
 Возвращает PNG tile для отображения карты.
 
 Этот endpoint напрямую используется картографической библиотекой в мобильном приложении. Например Leaflet/MapLibre/другой клиент подставляет `z`, `x`, `y` в URL шаблон и загружает нужные PNG-тайлы при перемещении или масштабировании карты.
+
+Сервис сначала ищет тайл локально в `/data/tiles`. Если тайл уже скачан, он отдается из локального хранилища. Если тайла нет, сервис скачивает его из OpenStreetMap, сохраняет локально и возвращает клиенту.
 
 Параметры path:
 
@@ -376,4 +444,4 @@ VITE_MAP_SERVICE_URL=http://192.168.1.50:8090
 
 ## Заметки для production
 
-Тайлы сейчас проксируются с `https://tile.openstreetmap.org`. Для production нужно заменить это на собственный tile provider/cache и закрыть публичный доступ правилами rate limit/API gateway.
+Текущая реализация уже хранит PBF-файл и кеширует PNG-тайлы локально. Для production следующий шаг - заменить upstream `https://tile.openstreetmap.org` на собственный tile server/render pipeline, который будет строить тайлы из локального `turkmenistan-latest.osm.pbf`.

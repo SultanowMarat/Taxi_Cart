@@ -8,6 +8,9 @@
 - manifest тайлов для клиентского кеша;
 - delta-обновления карты;
 - версию карты;
+- startup-загрузку OSM PBF-файла Туркменистана;
+- ночную синхронизацию OSM PBF-файла;
+- локальное кеширование PNG-тайлов;
 - OpenAPI/Swagger документацию.
 
 ## Координаты
@@ -34,7 +37,13 @@ GPS-координаты водителя или клиента получает
 GET /tiles/{z}/{x}/{y}.png
 ```
 
-проксирует PNG-тайлы из OpenStreetMap.
+отдает PNG-тайлы по cache-first схеме:
+
+1. Сначала проверяет локальный файл `/data/tiles/{z}/{x}/{y}.png`.
+2. Если файл есть, отдает его без обращения во внешний сервис.
+3. Если файла нет, скачивает тайл из OpenStreetMap.
+4. Сохраняет скачанный тайл в `/data/tiles`.
+5. Возвращает тайл клиенту.
 
 В Docker Compose подготовлен volume:
 
@@ -42,7 +51,35 @@ GET /tiles/{z}/{x}/{y}.png
 infra/map-service/tiles -> /data/tiles
 ```
 
-Но текущая реализация еще не сохраняет тайлы в `/data/tiles`. Для production нужно добавить локальный tile cache или отдельный tile server.
+После первого запроса конкретный тайл хранится локально.
+
+## Синхронизация OSM PBF
+
+При запуске `map-service` проверяет локальный файл:
+
+```text
+/data/osm/turkmenistan-latest.osm.pbf
+```
+
+Если файла нет, сервис скачивает карту Туркменистана из Geofabrik:
+
+```text
+https://download.geofabrik.de/asia/turkmenistan-latest.osm.pbf
+```
+
+Рядом сохраняется metadata:
+
+```text
+/data/osm/turkmenistan-latest.osm.pbf.metadata.json
+```
+
+Каждую ночь сервис делает `HEAD`-проверку remote-файла. Если изменился `ETag`, `Last-Modified` или `Content-Length`, сервис скачивает новую версию PBF, обновляет metadata и меняет версию карты, которую отдает `/api/map/version`.
+
+По умолчанию синхронизация запускается в `03:00 UTC`:
+
+```env
+MAP_SYNC_HOUR_UTC=3
+```
 
 ## Контракт кеша карты
 
