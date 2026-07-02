@@ -36,9 +36,55 @@ info:
 servers:
   - url: http://localhost:8090
 paths:
+  /:
+    get:
+      summary: Service root
+      operationId: redirectToSwagger
+      description: Служебный root endpoint. Делает redirect на /swagger, чтобы при открытии базового URL сразу попасть в документацию сервиса.
+      responses:
+        "302":
+          description: Redirect to Swagger UI.
+  /swagger:
+    get:
+      summary: Swagger UI
+      operationId: getSwaggerUI
+      description: Возвращает HTML-страницу Swagger UI для ручного тестирования API. Swagger UI использует локальную спецификацию /openapi.yaml.
+      responses:
+        "200":
+          description: Swagger UI HTML page.
+          content:
+            text/html:
+              schema:
+                type: string
+  /docs:
+    get:
+      summary: Documentation UI alias
+      operationId: getDocsUI
+      description: Alias для /swagger. Возвращает ту же HTML-страницу документации API.
+      responses:
+        "200":
+          description: Swagger UI HTML page.
+          content:
+            text/html:
+              schema:
+                type: string
+  /openapi.yaml:
+    get:
+      summary: OpenAPI spec
+      operationId: getOpenAPISpec
+      description: Возвращает OpenAPI 3.0 YAML контракт микросервиса. Используется Swagger UI, Postman/Insomnia и генераторами API-клиентов.
+      responses:
+        "200":
+          description: OpenAPI YAML document.
+          content:
+            application/yaml:
+              schema:
+                type: string
   /health:
     get:
       summary: Healthcheck
+      operationId: getHealth
+      description: Проверяет, что map-service запущен и отвечает на HTTP-запросы. Используется для Docker/Kubernetes healthcheck, мониторинга и быстрой диагностики после запуска.
       responses:
         "200":
           description: Service health status.
@@ -49,6 +95,8 @@ paths:
   /api/map/version:
     get:
       summary: Current map version
+      operationId: getMapVersion
+      description: Возвращает текущую версию карты. Мобильные приложения вызывают этот endpoint перед синхронизацией кеша, чтобы понять, нужно ли запрашивать manifest и delta update.
       responses:
         "200":
           description: Current map version metadata.
@@ -59,9 +107,12 @@ paths:
   /api/map/manifest:
     get:
       summary: Tile manifest
+      operationId: getMapManifest
+      description: Возвращает manifest тайлов для региона: поддерживаемые zoom levels, checksum значения и URL template. Клиент использует эти данные для первичной загрузки и проверки локального кеша карты.
       parameters:
         - name: region
           in: query
+          description: Регион карты. Если параметр не передан, используется turkmenistan.
           required: false
           schema:
             type: string
@@ -76,15 +127,19 @@ paths:
   /api/map/delta:
     get:
       summary: Tile delta
+      operationId: getMapDelta
+      description: Возвращает список измененных и удаленных тайлов между двумя версиями карты. Нужен, чтобы мобильное приложение скачивало только изменения, а не всю карту заново.
       parameters:
         - name: from
           in: query
+          description: Версия карты, которая уже сохранена на устройстве.
           required: false
           schema:
             type: string
           example: tm-2026.05-demo
         - name: to
           in: query
+          description: Целевая версия карты. Если не передана, используется текущая версия сервиса.
           required: false
           schema:
             type: string
@@ -99,6 +154,8 @@ paths:
   /api/map/download-info:
     get:
       summary: OSM PBF download info
+      operationId: getMapDownloadInfo
+      description: Возвращает диагностическую информацию об OSM PBF-файле: источник, путь внутри контейнера, наличие файла, размер и дату изменения. Используется для проверки инфраструктуры и подготовки offline/OSRM данных.
       responses:
         "200":
           description: Local OSM source file status.
@@ -109,21 +166,26 @@ paths:
   /tiles/{z}/{x}/{y}.png:
     get:
       summary: Raster tile
+      operationId: getRasterTile
+      description: Возвращает PNG raster tile по координатам web map tile scheme. Этот endpoint напрямую использует мобильное приложение или картографическая библиотека для отображения карты.
       parameters:
         - name: z
           in: path
+          description: Zoom level карты.
           required: true
           schema:
             type: integer
           example: 10
         - name: x
           in: path
+          description: Номер колонки tile.
           required: true
           schema:
             type: integer
           example: 637
         - name: y
           in: path
+          description: Номер строки tile.
           required: true
           schema:
             type: integer
