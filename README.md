@@ -340,12 +340,6 @@ curl http://localhost:8090/api/map/download-info
 http://localhost:8090/tiles/10/637/412.png
 ```
 
-Для Android emulator на Mac:
-
-```text
-http://10.0.2.2:8090/tiles/10/637/412.png
-```
-
 Успешный ответ:
 
 ```text
@@ -358,25 +352,9 @@ Content-Type: image/png
 502 Bad Gateway
 ```
 
-## Подключение Android emulator на Mac
+## Подключение локального приложения
 
-Для Android emulator нельзя использовать `localhost` внутри мобильного приложения, потому что `localhost` будет указывать на сам эмулятор.
-
-Используйте `10.0.2.2`, это адрес host-машины из Android emulator:
-
-```env
-VITE_MAP_SERVICE_URL=http://10.0.2.2:8090
-```
-
-Если приложение также ходит в backend:
-
-```env
-VITE_API_URL=http://10.0.2.2:8080
-VITE_WS_URL=ws://10.0.2.2:8080
-VITE_MAP_SERVICE_URL=http://10.0.2.2:8090
-```
-
-Для iOS Simulator обычно можно использовать:
+Если приложение запущено на той же машине, что и `map-service`, можно использовать:
 
 ```env
 VITE_MAP_SERVICE_URL=http://localhost:8090

@@ -74,12 +74,6 @@ VITE_MAP_SERVICE_URL
 VITE_MAP_SERVICE_URL=http://localhost:8090
 ```
 
-Android emulator на Mac:
-
-```env
-VITE_MAP_SERVICE_URL=http://10.0.2.2:8090
-```
-
 Физический телефон в той же Wi-Fi сети:
 
 ```env
