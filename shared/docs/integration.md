@@ -1,47 +1,89 @@
-# Integration Notes
+# Интеграция микросервиса карт
 
-The MVP is split into independent projects:
+## Роль map-service
 
-- `backend`: REST API and binary realtime WebSocket.
-- `map-service`: tile manifest, delta API and raster tile delivery.
-- `client-app`: mobile-first customer PWA.
-- `driver-app`: mobile-first driver PWA.
-- `admin`: desktop operations panel.
+`map-service` отвечает за картографическую часть Taxi MVP:
 
-## Realtime Frame
+- выдачу PNG-тайлов карты;
+- manifest тайлов для клиентского кеша;
+- delta-обновления карты;
+- версию карты;
+- OpenAPI/Swagger документацию.
 
-The shared schema is `shared/proto/ws.proto`. The runnable MVP uses a compact binary frame where the first byte is `MessageType` and the remaining bytes are a UTF-8 payload matching the proto message shape. This gives all apps a binary WebSocket contract and keeps generation tooling optional for the first runnable phase.
+## Координаты
 
-## Map Cache Contract
+GPS-координаты водителя или клиента получает не map-service, а мобильное приложение через геолокацию устройства.
 
-Frontends read:
+Дальше мобильное приложение отправляет координаты в основной `backend`, где обрабатываются:
+
+- live-локация водителя;
+- движение маркера на карте;
+- статусы поездки;
+- WebSocket-обновления;
+- логика заказов.
+
+`map-service` может получать координаты в будущих endpoint'ах, например для reverse geocoding или построения маршрута, но в текущей версии такие endpoint'ы не реализованы.
+
+## Тайлы
+
+Тайлы относятся к `map-service`.
+
+Сейчас endpoint:
+
+```text
+GET /tiles/{z}/{x}/{y}.png
+```
+
+проксирует PNG-тайлы из OpenStreetMap.
+
+В Docker Compose подготовлен volume:
+
+```text
+infra/map-service/tiles -> /data/tiles
+```
+
+Но текущая реализация еще не сохраняет тайлы в `/data/tiles`. Для production нужно добавить локальный tile cache или отдельный tile server.
+
+## Контракт кеша карты
+
+Мобильные приложения читают:
 
 1. `GET /api/map/version`
 2. `GET /api/map/manifest?region=turkmenistan`
 3. `GET /api/map/delta?from=<cached>&to=<current>`
 
-Changed tile checksums are stored in IndexedDB/local cache by the apps.
+Логика:
 
-## Map Service URL For Mobile Apps
+1. Приложение получает текущую версию карты.
+2. Сравнивает ее с версией, сохраненной на устройстве.
+3. Если версия изменилась, запрашивает manifest и delta.
+4. Скачивает только измененные тайлы.
+5. Удаляет тайлы, которые пришли в `deleted`.
 
-The customer and driver apps read the map base URL from `VITE_MAP_SERVICE_URL`.
+## URL map-service для мобильных приложений
 
-Local browser/PWA development on the same machine:
+Клиентское и водительское приложения читают базовый URL карты из:
+
+```env
+VITE_MAP_SERVICE_URL
+```
+
+Локальная разработка в браузере/PWA на той же машине:
 
 ```env
 VITE_MAP_SERVICE_URL=http://localhost:8090
 ```
 
-Android emulator against the host machine:
+Android emulator на Mac:
 
 ```env
 VITE_MAP_SERVICE_URL=http://10.0.2.2:8090
 ```
 
-Physical phones on the same Wi-Fi network:
+Физический телефон в той же Wi-Fi сети:
 
 ```env
 VITE_MAP_SERVICE_URL=http://<host-lan-ip>:8090
 ```
 
-Production builds should point to the public HTTPS URL of the deployed map service.
+Production-сборки должны указывать на публичный HTTPS URL развернутого `map-service`.

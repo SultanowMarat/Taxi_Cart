@@ -1,11 +1,11 @@
 package main
 
 const swaggerHTML = `<!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Taxi Map Service Swagger</title>
+  <title>Swagger микросервиса карт Taxi</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
   <style>
     body { margin: 0; background: #f7f7f7; }
@@ -30,105 +30,105 @@ const swaggerHTML = `<!doctype html>
 
 const openapiYAML = `openapi: 3.0.3
 info:
-  title: Taxi MVP Map Service API
+  title: API микросервиса карт Taxi MVP
   version: 1.0.0
-  description: Map microservice for Turkmenistan tile delivery, map version manifests and delta updates.
+  description: "Микросервис карт для выдачи тайлов, версионирования карты, manifest и delta-обновлений."
 servers:
   - url: http://localhost:8090
 paths:
   /:
     get:
-      summary: Service root
+      summary: Корень сервиса
       operationId: redirectToSwagger
-      description: Служебный root endpoint. Делает redirect на /swagger, чтобы при открытии базового URL сразу попасть в документацию сервиса.
+      description: "Служебный endpoint. Делает redirect на /swagger, чтобы при открытии базового URL сразу попасть в документацию сервиса."
       responses:
         "302":
-          description: Redirect to Swagger UI.
+          description: Redirect на Swagger UI.
   /swagger:
     get:
       summary: Swagger UI
       operationId: getSwaggerUI
-      description: Возвращает HTML-страницу Swagger UI для ручного тестирования API. Swagger UI использует локальную спецификацию /openapi.yaml.
+      description: "Возвращает HTML-страницу Swagger UI для ручного тестирования API."
       responses:
         "200":
-          description: Swagger UI HTML page.
+          description: HTML-страница Swagger UI.
           content:
             text/html:
               schema:
                 type: string
   /docs:
     get:
-      summary: Documentation UI alias
+      summary: Документация API
       operationId: getDocsUI
-      description: Alias для /swagger. Возвращает ту же HTML-страницу документации API.
+      description: "Алиас для /swagger. Возвращает ту же HTML-страницу документации API."
       responses:
         "200":
-          description: Swagger UI HTML page.
+          description: HTML-страница Swagger UI.
           content:
             text/html:
               schema:
                 type: string
   /openapi.yaml:
     get:
-      summary: OpenAPI spec
+      summary: OpenAPI спецификация
       operationId: getOpenAPISpec
-      description: Возвращает OpenAPI 3.0 YAML контракт микросервиса. Используется Swagger UI, Postman/Insomnia и генераторами API-клиентов.
+      description: "Возвращает OpenAPI 3.0 YAML контракт микросервиса. Используется Swagger UI, Postman/Insomnia и генераторами API-клиентов."
       responses:
         "200":
-          description: OpenAPI YAML document.
+          description: OpenAPI YAML документ.
           content:
             application/yaml:
               schema:
                 type: string
   /health:
     get:
-      summary: Healthcheck
+      summary: Проверка состояния сервиса
       operationId: getHealth
-      description: Проверяет, что map-service запущен и отвечает на HTTP-запросы. Используется для Docker/Kubernetes healthcheck, мониторинга и быстрой диагностики после запуска.
+      description: "Проверяет, что map-service запущен и отвечает на HTTP-запросы. Используется для Docker/Kubernetes healthcheck, мониторинга и быстрой диагностики после запуска."
       responses:
         "200":
-          description: Service health status.
+          description: Текущее состояние сервиса.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
   /api/map/version:
     get:
-      summary: Current map version
+      summary: Текущая версия карты
       operationId: getMapVersion
-      description: Возвращает текущую версию карты. Мобильные приложения вызывают этот endpoint перед синхронизацией кеша, чтобы понять, нужно ли запрашивать manifest и delta update.
+      description: "Возвращает текущую версию карты. Мобильные приложения вызывают этот endpoint перед синхронизацией кеша, чтобы понять, нужно ли запрашивать manifest и delta update."
       responses:
         "200":
-          description: Current map version metadata.
+          description: Метаданные текущей версии карты.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapVersionResponse"
   /api/map/manifest:
     get:
-      summary: Tile manifest
+      summary: Manifest тайлов
       operationId: getMapManifest
-      description: Возвращает manifest тайлов для региона: поддерживаемые zoom levels, checksum значения и URL template. Клиент использует эти данные для первичной загрузки и проверки локального кеша карты.
+      description: "Возвращает manifest тайлов для региона: поддерживаемые zoom levels, checksum значения и URL template. Клиент использует эти данные для первичной загрузки и проверки локального кеша карты."
       parameters:
         - name: region
           in: query
-          description: Регион карты. Если параметр не передан, используется turkmenistan.
+          description: "Регион карты. Если параметр не передан, используется turkmenistan."
           required: false
           schema:
             type: string
             default: turkmenistan
       responses:
         "200":
-          description: Tile groups and checksums for client cache synchronization.
+          description: Группы тайлов и checksum для синхронизации кеша клиента.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapManifestResponse"
   /api/map/delta:
     get:
-      summary: Tile delta
+      summary: Delta-обновление карты
       operationId: getMapDelta
-      description: Возвращает список измененных и удаленных тайлов между двумя версиями карты. Нужен, чтобы мобильное приложение скачивало только изменения, а не всю карту заново.
+      description: "Возвращает список измененных и удаленных тайлов между двумя версиями карты. Нужен, чтобы мобильное приложение скачивало только изменения, а не всю карту заново."
       parameters:
         - name: from
           in: query
@@ -146,28 +146,28 @@ paths:
           example: tm-2026.06-demo
       responses:
         "200":
-          description: Changed and deleted tiles between versions.
+          description: Измененные и удаленные тайлы между версиями.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MapDeltaResponse"
   /api/map/download-info:
     get:
-      summary: OSM PBF download info
+      summary: Информация об OSM PBF-файле
       operationId: getMapDownloadInfo
-      description: Возвращает диагностическую информацию об OSM PBF-файле: источник, путь внутри контейнера, наличие файла, размер и дату изменения. Используется для проверки инфраструктуры и подготовки offline/OSRM данных.
+      description: "Возвращает диагностическую информацию об OSM PBF-файле: источник, путь внутри контейнера, наличие файла, размер и дату изменения. Используется для проверки инфраструктуры и подготовки offline/OSRM данных."
       responses:
         "200":
-          description: Local OSM source file status.
+          description: Статус локального OSM PBF-файла.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/DownloadInfoResponse"
   /tiles/{z}/{x}/{y}.png:
     get:
-      summary: Raster tile
+      summary: PNG-тайл карты
       operationId: getRasterTile
-      description: Возвращает PNG raster tile по координатам web map tile scheme. Этот endpoint напрямую использует мобильное приложение или картографическая библиотека для отображения карты.
+      description: "Возвращает PNG raster tile по координатам web map tile scheme. Этот endpoint напрямую использует мобильное приложение или картографическая библиотека для отображения карты."
       parameters:
         - name: z
           in: path
@@ -192,110 +192,144 @@ paths:
           example: 412
       responses:
         "200":
-          description: PNG map tile.
+          description: PNG-тайл карты.
           content:
             image/png:
               schema:
                 type: string
                 format: binary
         "502":
-          description: Upstream tile provider is unavailable.
+          description: Внешний tile provider недоступен.
 components:
   schemas:
     HealthResponse:
       type: object
+      description: Ответ healthcheck endpoint.
       properties:
         ok:
           type: boolean
+          description: Признак, что сервис работает.
           example: true
         service:
           type: string
+          description: Имя сервиса.
           example: map-service
         time:
           type: string
           format: date-time
+          description: Текущее серверное время.
     MapVersionResponse:
       type: object
+      description: Текущая версия карты.
       properties:
         region:
           type: string
+          description: Регион карты.
           example: turkmenistan
         version:
           type: string
+          description: Версия набора тайлов и картографических данных.
           example: tm-2026.06-demo
         updatedAt:
           type: string
           format: date-time
+          description: Время формирования ответа.
     MapManifestResponse:
       type: object
+      description: Manifest для кеширования карты на клиенте.
       properties:
         region:
           type: string
+          description: Регион карты.
           example: turkmenistan
         version:
           type: string
+          description: Версия карты.
           example: tm-2026.06-demo
         strategy:
           type: string
+          description: Стратегия обновления карты.
           example: delta
         nightlySyncHour:
           type: integer
+          description: Рекомендуемый час фоновой синхронизации.
           example: 3
         tiles:
           type: array
+          description: Группы тайлов для загрузки и проверки кеша.
           items:
             $ref: "#/components/schemas/TileGroup"
     TileGroup:
       type: object
+      description: Группа тайлов одного zoom level.
       properties:
         z:
           type: integer
+          description: Zoom level.
           example: 10
         checksum:
           type: string
+          description: Контрольная сумма группы тайлов.
         urlTemplate:
           type: string
+          description: URL-шаблон для загрузки PNG-тайлов.
           example: /tiles/{z}/{x}/{y}.png
     MapDeltaResponse:
       type: object
+      description: Delta-обновление между версиями карты.
       properties:
         from:
           type: string
+          description: Старая версия карты.
         to:
           type: string
+          description: Новая версия карты.
         changed:
           type: array
+          description: Тайлы, которые нужно скачать заново.
           items:
             $ref: "#/components/schemas/ChangedTile"
         deleted:
           type: array
+          description: Тайлы, которые нужно удалить из локального кеша.
           items:
             type: string
     ChangedTile:
       type: object
+      description: Измененный tile.
       properties:
         z:
           type: integer
+          description: Zoom level.
         x:
           type: integer
+          description: Колонка tile.
         y:
           type: integer
+          description: Строка tile.
         checksum:
           type: string
+          description: Новый checksum tile.
     DownloadInfoResponse:
       type: object
+      description: Информация об OSM PBF-файле.
       properties:
         source:
           type: string
           format: uri
+          description: URL источника OSM данных.
         path:
           type: string
+          description: Путь к файлу внутри контейнера.
         exists:
           type: boolean
+          description: Найден ли файл.
         sizeBytes:
           type: integer
           format: int64
+          description: Размер файла в байтах.
         modifiedAt:
           type: string
           format: date-time
+          description: Время последнего изменения файла.
 `

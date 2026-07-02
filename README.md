@@ -11,11 +11,51 @@
 - информацию о локальном OSM PBF-файле;
 - Swagger UI для ручного тестирования API.
 
+## Зона ответственности
+
+Этот микросервис отвечает именно за картографическую часть:
+
+- отдает тайлы карты по URL `/tiles/{z}/{x}/{y}.png`;
+- сообщает текущую версию карты;
+- отдает manifest тайлов для кеширования на клиенте;
+- отдает delta-обновления между версиями карты;
+- показывает диагностическую информацию по OSM PBF-файлу;
+- предоставляет Swagger/OpenAPI документацию.
+
+Что сервис сейчас не делает:
+
+- не получает GPS-координаты водителя или клиента с телефона;
+- не хранит live-локацию водителей;
+- не занимается заказами, статусами поездок и WebSocket-трекингом;
+- не строит маршруты между двумя точками.
+
+GPS-координаты получает мобильное приложение через геолокацию устройства. Затем приложение отправляет эти координаты в основной backend, где живет realtime-логика такси: водитель онлайн, движение маркера, заказ, статусы поездки.
+
+Map-service может принимать координаты как параметры будущих картографических endpoint'ов, например для reverse geocoding, geocoding или построения маршрута, но в текущей версии таких endpoint'ов еще нет.
+
+## Тайлы
+
+Тайлы тоже относятся к этому микросервису.
+
+Сейчас endpoint `/tiles/{z}/{x}/{y}.png` проксирует PNG-тайлы из OpenStreetMap:
+
+```text
+https://tile.openstreetmap.org/{z}/{x}/{y}.png
+```
+
+В Docker Compose уже подготовлен volume для локального хранения тайлов:
+
+```text
+infra/map-service/tiles -> /data/tiles
+```
+
+Но в текущей реализации постоянное сохранение тайлов в `/data/tiles` еще не включено: сервис получает тайл от upstream-провайдера и сразу отдает его клиенту. Для production правильнее добавить локальный tile cache или собственный tile server, чтобы тайлы реально хранились у нас и приложение не зависело напрямую от публичного OpenStreetMap tile endpoint.
+
 ## Структура
 
 ```text
-map-service/                         Go microservice
-infra/docker-compose.map-service.yml Standalone Docker Compose
+map-service/                         Go-микросервис карты
+infra/docker-compose.map-service.yml Отдельный Docker Compose
 shared/openapi/map-service.yaml      OpenAPI спецификация
 shared/docs/integration.md           Интеграционные заметки
 ```
@@ -46,11 +86,11 @@ OpenAPI YAML:
 http://localhost:8090/openapi.yaml
 ```
 
-## Endpoint'ы
+## Эндпоинты
 
 ### `GET /`
 
-Служебный root endpoint.
+Служебный корневой endpoint.
 
 Он не возвращает бизнес-данные, а делает redirect на Swagger UI: `/swagger`. Нужен для удобства: можно открыть `http://localhost:8090/` и сразу попасть в документацию сервиса.
 
@@ -107,7 +147,7 @@ http://localhost:8090/swagger
 
 ### `GET /docs`
 
-Alias для Swagger UI.
+Алиас для Swagger UI.
 
 Работает так же, как `/swagger`, и нужен для удобного короткого URL документации.
 
@@ -356,6 +396,6 @@ VITE_MAP_SERVICE_URL=http://<mac-lan-ip>:8090
 VITE_MAP_SERVICE_URL=http://192.168.1.50:8090
 ```
 
-## Production notes
+## Заметки для production
 
 Тайлы сейчас проксируются с `https://tile.openstreetmap.org`. Для production нужно заменить это на собственный tile provider/cache и закрыть публичный доступ правилами rate limit/API gateway.
